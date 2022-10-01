@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<!-- https://simplemaps.com/data/us-cities
+ https://observablehq.com/@karlsluis/us-rivers
+ https://eric.clst.org/tech/usgeojson/
+ https://raw.githubusercontent.com/ResidentMario/geoplot-data/master/contiguous-usa.geojson-->
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Project 2 Data Vis</title>
+    <script src="https://d3js.org/d3.v7.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.min.js"></script>
+    <style>
+        path {
+            fill: none;
+            stroke-width: 1px;
+            stroke: #222;
+        }
+        body {background-color: #AAA7A7;}
+    </style>
+</head>
+<body>
+<H2 style="font-family:verdana;">Hypothesis: Cities on the coast will have higher population densities that inland cities</H2>
+
+<hr>
+<h3 style="font-family:verdana;">Cities plotted with area proportional to population, color proportional to population density </h3>
+
+<svg width="900" height="600">
+    <g id = "colorBar" ></g>
+    <g id="whiteRect"></g>
+    <g id="mapLayer"></g>
+    <g id="cityLayer"></g>
+    <g id="riverLayer"></g>
+</svg>
+
+<p style="font-family:verdana; font-size: 10px">City data taken from: https://simplemaps.com/data/us-cities  </p>
+<p style="font-family:verdana; font-size: 10px"> GeoJson US map taken from: https://eric.clst.org/tech/usgeojson/  </p>
+
+
+<script type="text/javascript">
+    var maxpop = 15000
+    var minpop = 150
+
+    var colorScale = d3.scaleQuantize()
+        .domain([minpop,maxpop])
+        .range(["#e7e5f1","#e6e5f1","#e5e4f0","#e5e4f0","#e4e3f0","#e3e2ef","#e3e2ef","#e2e1ef","#e1e1ee","#e1e0ee","#e0dfee","#dfdfed","#dedeed","#dedded","#ddddec","#dcdcec","#dbdbec","#dbdaeb","#dadaeb","#d9d9ea","#d8d8ea","#d7d7ea","#d7d7e9","#d6d6e9","#d5d5e8","#d4d4e8","#d3d3e8","#d2d3e7","#d2d2e7","#d1d1e6","#d0d0e6","#cfcfe5","#cecee5","#cdcee5","#cccde4","#cbcce4","#cbcbe3","#cacae3","#c9c9e2","#c8c8e2","#c7c7e1","#c6c6e1","#c5c5e0","#c4c4e0","#c3c3df","#c2c3df","#c1c2de","#c0c1de","#bfc0dd","#bebfdd","#bebedc","#bdbddc","#bcbcdb","#bbbbda","#babada","#b9b9d9","#b8b8d9","#b7b7d8","#b6b5d8","#b5b4d7","#b4b3d6","#b3b2d6","#b2b1d5","#b1b0d5","#b0afd4","#afaed4","#aeadd3","#aeacd2","#adabd2","#acaad1","#aba9d1","#aaa8d0","#a9a7cf","#a8a6cf","#a7a5ce","#a6a4ce","#a5a3cd","#a4a2cd","#a3a1cc","#a2a0cb","#a19fcb","#a09eca","#9f9dca","#9e9cc9","#9e9ac9","#9d9ac8","#9c99c8","#9b98c7","#9a97c7","#9996c6","#9895c6","#9794c5","#9693c5","#9592c4","#9491c4","#9390c3","#928fc3","#918ec2","#908dc2","#908cc1","#8f8bc1","#8e8ac0","#8d89c0","#8c88bf","#8b87bf","#8a86be","#8985be","#8884bd","#8883bd","#8782bc","#8680bc","#857fbb","#847eba","#837dba","#827cb9","#827bb9","#817ab8","#8079b8","#7f77b7","#7e76b6","#7e75b6","#7d74b5","#7c73b4","#7b71b4","#7b70b3","#7a6fb3","#796eb2","#786cb1","#786bb1","#776ab0","#7668af","#7567af","#7566ae","#7465ad","#7363ad","#7362ac","#7261ab","#715fab","#705eaa","#705ca9","#6f5ba8","#6e5aa8","#6e58a7","#6d57a6","#6c56a6","#6c54a5","#6b53a4","#6a52a4","#6950a3","#694fa2","#684ea2","#674ca1","#674ba0","#664aa0","#65489f","#65479e","#64469e","#63449d","#63439c","#62429c","#61409b","#613f9a","#603e9a","#5f3c99","#5e3b99","#5e3a98","#5d3897","#5c3797","#5c3696","#5b3595","#5a3395","#5a3294","#593194","#582f93","#582e92","#572d92","#562b91","#562a91","#552990","#54288f","#54268f","#53258e","#52248e","#52238d","#51218c","#50208c","#501f8b","#4f1e8b","#4e1c8a","#4e1b8a","#4d1a89","#4c1988","#4c1788","#4b1687","#4a1587","#4a1486","#491286","#481185","#481084","#470f84","#460d83","#460c83","#450b82","#440a82","#440981","#430780","#420680","#42057f","#41047f","#40027e","#40017e","#3f007d"]);
+
+    async function cities() {
+        let svg = d3.select("svg");
+        let width = parseInt(svg.attr("width"));
+        let height = parseInt(svg.attr("height"));
+
+
+       let projection = d3.geoAlbersUsa()
+            .translate([width / 2, height / 2])
+            .scale([1200]);
+
+        let path = d3.geoPath()
+            .projection(projection);
+
+        // Load in GeoJSON data
+        //json = await d3.json("contiguous-usa.geojson");
+        json = await d3.json("gz_2010_us_040_00_20m.json");
+
+        // Bind data and create one path per GeoJSON feature
+        d3.select("#mapLayer").selectAll("path")
+            .data(json.features)
+            .join("path")
+            // here we use the familiar d attribute again to define the path
+            .attr("d", path);
+
+        var defs = svg.append("defs");
+
+        var linearGradient = defs.append("linearGradient")
+            .attr("id", "linear-gradient")
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "100%")
+            .attr("y2", "0%");
+
+
+        //Set the color for the start (0%)
+        linearGradient.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", "#e7e5f1"); //light blue
+
+//Set the color for the end (100%)
+        linearGradient.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", "#3f007d"); //dark blue
+
+        svg.append("rect")
+            .attr("width", 300)
+            .attr("height", 20)
+            .attr("x",520)
+            .attr("y", 50)
+            .style("fill", "url(#linear-gradient)");
+
+        svg.append("text")
+            .style("fill","black")
+            .style("font-size","14px")
+            .style("font-weight", "bold")
+            .attr("x", 470)
+            .attr("y", 30)
+            .style("style","label")
+            .text("← (150)      Density-Estimated population per square km      (1500) →")
+
+
+
+
+        /*
+        // Load in GeoJSON data
+        json = await d3.json("rivers.json");
+        // Bind data and create one path per GeoJSON feature
+        d3.select("#riverLayer").selectAll("path")
+            .data(json.features)
+            .join("path")
+            // here we use the familiar d attribute again to define the path
+            .attr("d", path);
+
+         */
+
+        // Load in cities data.
+        //let data = await d3.csv("https://raw.githubusercontent.com/Pulsy1577/Data-Visualization-Project-1/main/uscities.csv");
+
+        //let data = await d3.csv("https://raw.githubusercontent.com/Pulsy1577/Data-Visualization-Project-1/main/cities_test.csv")
+        let data = await d3.csv("https://raw.githubusercontent.com/Pulsy1577/Data-Visualization-Project-1/main/cities_test.csv")
+
+        d3.select("#cityLayer").selectAll("circle")
+            .data(data)
+            .join("circle")
+            .attr("cx", function (d) {
+                return projection([d.lon, d.lat])[0];
+            })
+            .attr("cy", function (d) {
+                return projection([d.lon, d.lat])[1];
+            })
+            .attr("r", function (d) {
+                return Math.sqrt(parseInt(d.population) * 0.000009);
+            })
+            //.style("fill", "steelblue")
+            .attr("fill", function (d) {
+                return colorScale(d.density);
+            })
+
+            .style("opacity", 0.9);
+
+
+
+    }
+    cities();
+
+
+</script>
+</body>
+</html>
